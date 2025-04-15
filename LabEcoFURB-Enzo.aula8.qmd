@@ -1,0 +1,81 @@
+---
+title: "Enzo Euzebio Martins da Veiga"
+format: html
+editor: visual
+---
+
+```{r}
+#| label: load-packages
+#| include: false
+
+library(tidyverse)
+library(WDI)
+
+options(scipen = 999) # REMOVER A NOT. CIENT.
+# DADOS EM PAINEL
+dadospib <- WDI(country = 'all',
+                indicator = 'NY.GDP.MKTP.CD')
+
+paises <- c('BR', 'US')
+
+dadospibbrus <- WDI(country = paises,
+                    indicator = 'NY.GDP.MKTP.CD')
+
+# CORTE TRANSVERSAL
+dadospib2023 <- WDI(country = 'all',
+                    indicator = 'NY.GDP.MKTP.CD',
+                    start = 2023, end = 2023)
+
+# SÉRIE TEMPORAL
+dadospibbr <- WDI(country = 'BR',
+                  indicator = 'NY.GDP.MKTP.CD')
+```
+
+## VARIÁVEL
+
+Falar sobre a variável que vocês escolheram. Qual é a fonte? Medida?
+
+## GRÁFICO DE DADOS EM PAINEL
+
+Falar sobre o gráfico de dados em painel.
+
+```{r}
+#| label: graficodadosempainel
+#| warning: false
+#| echo: false
+
+ggplot(dadospib,
+       mapping = aes(y = NY.GDP.MKTP.CD,
+                                   x = year)) +
+  geom_point()
+```
+
+## GRÁFICO DE DADOS DE CORTE TRANSVERSAL
+
+Falar sobre o gráfico de dados de corte transversal.
+
+```{r}
+#| label: graficocortetransversal 
+#| warning: false 
+#| echo: false  
+
+ggplot(dadospib2023,
+       mapping = aes(y = NY.GDP.MKTP.CD,
+                                  x = year)) +
+  geom_point()
+```
+
+## GRÁFICO DE DADOS DE SÉRIE TEMPORAL
+
+Falar sobre o gráfico de dados de série temporal.
+
+```{r}
+#| label: graficoserietemporal 
+#| warning: false  
+#| echo: false    
+
+ggplot(dadospibbr,
+       mapping = aes(y = NY.GDP.MKTP.CD,
+                                  x = year)) +
+  geom_line()
+```
