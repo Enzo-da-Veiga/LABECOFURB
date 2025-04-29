@@ -1,0 +1,164 @@
+---
+title: "Enzo Euzébio Martins da Veiga"
+format: html
+editor: visual
+---
+
+```{r}
+#| label: load-packages
+#| include: false
+
+#install.packages("palmerpenguins")
+#install.packages("scales")
+#install.packages("tidyverse")
+#install.packages("WDI")
+library("palmerpenguins")
+library("scales")
+library("tidyverse")
+library("WDI")
+
+options(scipen = 999) # REMOVER A NOT. CIENT.
+# DADOS EM PAINEL
+dadosChangesinventories <- WDI(country = 'all',
+                indicator = 'NE.GDI.STKB.CD')
+
+paises <- c('BR', 'US')
+
+dadosChangesinventoriesbrus <- WDI(country = paises,
+                    indicator = 'NE.GDI.STKB.CD')
+
+# CORTE TRANSVERSAL
+dadosChangesinventories2023 <- WDI(country = 'all',
+                    indicator = 'NE.GDI.STKB.CD',
+                    start = 2023, end = 2023)
+
+# SÉRIE TEMPORAL
+dadosChangesinventoriesbr <- WDI(country = 'BR',
+                  indicator = 'NE.GDI.STKB.CD')
+```
+
+## **Mudanças nos Inventários**
+
+Que mede a diferença entre os estoques de mercadorias e materiais dentro de uma economia ao longo de um período. Ele é utilizado para entender a produção, o consumo e as flutuações econômicas, sendo importante tanto para o cálculo do PIB quanto para análise de ciclos econômicos.
+
+### **Utilização do Indicador:**
+
+**Cálculo do PIB:** Mudanças nos inventários podem impactar diretamente o cálculo do Produto Interno Bruto (PIB), pois afetam a medição do consumo e do investimento.
+
+**Análise de ciclo econômico:** As flutuações nos inventários muitas vezes indicam mudanças nos ciclos econômicos, como recessões ou períodos de expansão.
+
+**Expectativa de crescimento:** A análise das variações nos inventários pode ajudar a prever tendências de produção e consumo em uma economia.
+
+## GRÁFICO DE DADOS EM PAINEL
+
+O primeiro gráfico (`grafpainel`) busca mostrar como as mudanças nos inventários variam ao longo dos anos para todos os países disponíveis no banco de dados (usando todos os países como amostra).
+
+```{r}
+library(tidyverse)
+library(WDI)
+library(scales)
+
+# Baixar dados da variável NE.GDI.STKB.CD (Changes in Inventories)
+dados <- WDI(country = "all", indicator = "NE.GDI.STKB.CD", start = 2000, end = 2023)
+
+# Remover agregações (geralmente com códigos iso2c de 2 caracteres não alfabéticos)
+dados <- dados %>%
+  filter(!iso2c %in% c("1W", "OE", "EU", "XC", "ZG", "ZJ", "ZF", "ZQ", "XN", "XP", "XD", "XR", "XU", "XT", "XY")) %>%
+  filter(!is.na(NE.GDI.STKB.CD))
+
+# Top 10 países com maiores valores médios de mudança nos inventários
+top10_paises <- dados %>%
+  group_by(country) %>%
+  summarise(media = mean(NE.GDI.STKB.CD, na.rm = TRUE)) %>%
+  arrange(desc(media)) %>%
+  slice_head(n = 10) %>%
+  pull(country)
+
+# Criar a coluna de destaque para cores
+dados <- dados %>%
+  mutate(highlight = case_when(
+    country == "Brazil" ~ "Brazil",
+    country %in% top10_paises ~ country,
+    TRUE ~ "Other"
+  ))
+
+# Paleta de cores: cada top 10 com uma cor, Brasil em vermelho, outros em cinza claro
+cores <- hue_pal()(length(top10_paises))
+names(cores) <- top10_paises
+cores["Brazil"] <- "red"
+cores <- c(cores, Other = "lightgrey")
+
+# Plot
+ggplot(dados, aes(x = year, y = NE.GDI.STKB.CD, color = highlight, group = country)) +
+  geom_line(size = 1, alpha = 0.8) +
+  scale_color_manual(values = cores) +
+  scale_y_continuous(labels = label_number(scale_cut = cut_short_scale())) +  # Ex: 10B, 200M
+  scale_x_continuous(breaks = seq(2000, 2023, 2)) +
+  labs(
+    title = "Mudanças nos Inventários - Destaques por País (2000–2023)",
+    x = "Ano",
+    y = "Mudança nos Inventários (USD)",
+    color = "Destaques"
+  ) +
+  theme_minimal(base_size = 14) +
+  theme(
+    legend.position = "right",
+    plot.title = element_text(hjust = 0.5, size = 18, face = "bold"),
+    axis.title = element_text(face = "bold"),
+    text = element_text(family = "Arial")
+  )
+```
+
+## GRÁFICO DE DADOS DE CORTE TRANSVERSAL
+
+O segundo gráfico (`grafcorte`) foca nas mudanças nos inventários de 2023, permitindo comparar esses dados entre os países para um único ano.
+
+```{r}
+#| label: grafico2
+#| warning: false 
+#| echo: false  
+
+dadosChangesinventories2023$highlight <- ifelse(dadosChangesinventories2023$iso2c == 'BR', 'Brazil', 'Other')
+head(dadosChangesinventories2023)
+
+# Gráfico de Dados de Corte Transversal
+grafcorte <- ggplot(dadosChangesinventories2023, 
+                    mapping = aes(x = year, y = NE.GDI.STKB.CD, color = highlight)) +
+  geom_point(alpha = 0.8, size = 3) +  # Usar pontos
+  labs(title = "Mudanças nas Inventários em 2023", 
+       x = "Ano", 
+       y = "Changes in Inventories 2023") +  # Eixo y modificado
+  scale_color_manual(values = c("Brazil" = "red", "Other" = "grey")) +  # Brasil em vermelho e outros em cinza
+  scale_y_continuous(labels = scales::label_number(accuracy = 0.00001)) +  # Arredondar
+  theme_minimal(base_size = 14) + 
+  theme(legend.position = "none", 
+        text = element_text(family = "Arial", color = "black"), 
+        plot.title = element_text(hjust = 0.5, size = 18, face = "bold"), 
+        axis.title = element_text(face = "bold"))
+print(grafcorte)  # Gráfico com os dados de 2023
+```
+
+## GRÁFICO DE DADOS DE SÉRIE TEMPORAL
+
+O terceiro gráfico (`grafserie`) mostra como as mudanças nos inventários ocorreram especificamente no Brasil ao longo do tempo.
+
+```{r}
+#| label: grafico3
+#| warning: false  
+#| echo: false    
+
+# Gráfico de Dados de Série Temporal
+grafserie <- ggplot(dadosChangesinventoriesbr, 
+                    mapping = aes(x = year, y = NE.GDI.STKB.CD)) +
+  geom_line(color = 'red', size = 1.5) +  # Linha vermelha para o Brasil
+  labs(title = "Mudanças nas Inventários - Brasil", 
+       x = "Ano", 
+       y = "Changes in Inventories Brazil") +  # Eixo y modificado
+  scale_y_continuous(labels = scales::label_number(accuracy = 0.00001)) +  # Arredondar
+  theme_minimal(base_size = 14) + 
+  theme(legend.position = "none", 
+        text = element_text(family = "Arial", color = "black"), 
+        plot.title = element_text(hjust = 0.5, size = 18, face = "bold"), 
+        axis.title = element_text(face = "bold"))
+print(grafserie)  # Gráfico com os dados do Brasil
+```
