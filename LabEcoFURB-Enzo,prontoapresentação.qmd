@@ -1,0 +1,468 @@
+---
+title: "Enzo Euzébio Martins da Veiga"
+format: html
+editor: visual
+---
+
+```{r}
+#| label: load-packages
+#| include: false
+
+#install.packages("palmerpenguins")
+#install.packages("scales")
+#install.packages("tidyverse")
+#install.packages("WDI")
+library("palmerpenguins")
+library("scales")
+library("tidyverse")
+library("WDI")
+
+options(scipen = 999) # REMOVER A NOT. CIENT.
+# DADOS EM PAINEL
+dadosChangesinventories <- WDI(country = 'all',
+                indicator = 'NE.GDI.STKB.CD')
+
+paises <- c('BR', 'US')
+
+dadosChangesinventoriesbrus <- WDI(country = paises,
+                    indicator = 'NE.GDI.STKB.CD')
+
+# CORTE TRANSVERSAL
+dadosChangesinventories2023 <- WDI(country = 'all',
+                    indicator = 'NE.GDI.STKB.CD',
+                    start = 2023, end = 2023)
+
+# SÉRIE TEMPORAL
+dadosChangesinventoriesbr <- WDI(country = 'BR',
+                  indicator = 'NE.GDI.STKB.CD')
+```
+
+## **Mudanças nos Inventários**
+
+Que mede a diferença entre os estoques de mercadorias e materiais dentro de uma economia ao longo de um período. Ele é utilizado para entender a produção, o consumo e as flutuações econômicas, sendo importante tanto para o cálculo do PIB quanto para análise de ciclos econômicos.
+
+### **Utilização do Indicador:**
+
+**Cálculo do PIB:** Mudanças nos inventários podem impactar diretamente o cálculo do Produto Interno Bruto (PIB), pois afetam a medição do consumo e do investimento.
+
+**Análise de ciclo econômico:** As flutuações nos inventários muitas vezes indicam mudanças nos ciclos econômicos, como recessões ou períodos de expansão.
+
+**Expectativa de crescimento:** A análise das variações nos inventários pode ajudar a prever tendências de produção e consumo em uma economia.
+
+## GRÁFICO DE DADOS EM PAINEL
+
+## **Gráfico 1 — Dados em Painel (Vários Países ao Longo do Tempo)**
+
+**O que mostra?**\
+Este gráfico apresenta a evolução das mudanças nos inventários para os 10 países com maiores médias, além do Brasil (destacado em vermelho), desde o início da coleta de dados até 2020.
+
+**Como interpretar?**
+
+As linhas representam a variação dos inventários ao longo dos anos para cada país.
+
+O Brasil está em vermelho para facilitar a comparação com os demais países.
+
+O eixo Y representa os valores das mudanças nos inventários, variando de +150 bilhões a -150 bilhões de dólares.
+
+O eixo X mostra os anos de 1980 a 2020, com intervalos de 10 anos.
+
+**O que observamos?**
+
+Há países com oscilações significativas, mostrando momentos de aumento ou redução expressiva dos estoques.
+
+O Brasil apresenta um comportamento intermediário, com flutuações menores em relação a algumas grandes economias.
+
+O gráfico evidencia as diferenças de padrão entre países desenvolvidos e emergentes.
+
+```{r}
+#| label: graficodadosChangesinventories
+#| warning: false
+#| echo: false
+ 
+# 1. Carregar pacotes
+library(dplyr)
+library(ggplot2)
+library(scales)
+
+# 2. Calcular médias por país (indicador NE.GDI.STKB.CD)
+medias <- dadosChangesinventories %>%
+  group_by(iso2c, country) %>%
+  summarise(media_valor = mean(NE.GDI.STKB.CD, na.rm = TRUE), .groups = "drop") %>%
+  arrange(desc(media_valor))
+
+# 3. Selecionar os 5 maiores países + Brasil
+top5 <- medias %>% slice_head(n = 5)
+brasil_info <- medias %>% filter(iso2c == "BR")
+top_paises <- bind_rows(top5, brasil_info) %>% distinct(iso2c, .keep_all = TRUE)
+
+# 4. Filtrar dados somente desses países e remover valores NA
+dados_filtrados <- dadosChangesinventories %>%
+  filter(iso2c %in% top_paises$iso2c) %>%
+  filter(!is.na(NE.GDI.STKB.CD), !is.na(year))
+
+# 5. Marcar Brasil com cor vermelha
+dados_filtrados <- dados_filtrados %>%
+  mutate(cor = ifelse(iso2c == "BR", "Brasil", "Outros"))
+
+# 6. Criar legenda personalizada com nomes + valores médios formatados
+legenda <- top_paises %>%
+  mutate(media_formatada = label_number(scale_cut = cut_short_scale())(media_valor),
+         nome_legenda = ifelse(iso2c == "BR",
+                               paste0(country, " (", media_formatada, ") [Brasil]"),
+                               paste0(country, " (", media_formatada, ")"))) %>%
+  arrange(desc(media_valor))
+
+# 7. Gerar gráfico com Brasil em vermelho e outros em azul (layout melhorado + eixo Y ampliado)
+grafico <- ggplot(dados_filtrados, aes(x = year, y = NE.GDI.STKB.CD, group = country)) +
+  geom_line(aes(color = cor), linewidth = 1.2, alpha = 0.9) +
+  scale_color_manual(values = c("Brasil" = "red", "Outros" = "steelblue")) +
+  facet_wrap(~ country, scales = "free_y", ncol = 2) +
+  scale_y_continuous(
+    labels = label_number(scale_cut = cut_short_scale()), 
+    breaks = seq(-200e9, 200e9, by = 100e9),  # <-- Intervalo de 100 bilhões
+    limits = c(-200e9, 200e9)
+  ) +
+  scale_x_continuous(
+    breaks = seq(1980, 2020, by = 10),
+    labels = seq(1980, 2020, by = 10),
+    limits = c(1980, 2020)
+  ) +
+  labs(
+    title = "Evolução das Mudanças nos Inventários (Changes in Inventories)",
+    subtitle = "Top 5 países com maiores médias + Brasil destacado em vermelho",
+    x = "Ano",
+    y = "Changes in Inventories",
+    caption = paste("Top países por valor médio:\n",
+                    paste0(seq_along(legenda$nome_legenda), ". ", legenda$nome_legenda, collapse = "\n"))
+  ) +
+  theme_minimal(base_size = 14) +
+  theme(
+    plot.title = element_text(face = "bold", size = 18, hjust = 0.5),
+    plot.subtitle = element_text(size = 13, hjust = 0.5),
+    plot.caption = element_text(size = 9, hjust = 0),
+    strip.text = element_text(face = "bold", size = 12),
+    axis.title.x = element_text(size = 12, margin = margin(t = 10)),
+    axis.title.y = element_text(size = 12, margin = margin(r = 10)),
+    axis.text.y = element_text(size = 10),
+    legend.position = "none",
+    plot.margin = margin(t = 10, r = 10, b = 20, l = 20)
+  )
+
+# 8. Exibir o gráfico
+print(grafico)
+
+# 9. (Opcional) Salvar o gráfico em um arquivo maior e legível
+ggsave("grafico_changes_inventories.png", grafico, width = 12, height = 8)
+
+# 1. Carregar pacotes
+library(dplyr)
+library(ggplot2)
+library(scales)
+library(RColorBrewer)
+
+# 2. Calcular médias por país (indicador NE.GDI.STKB.CD)
+medias <- dadosChangesinventories %>%
+  group_by(iso2c, country) %>%
+  summarise(media_valor = mean(NE.GDI.STKB.CD, na.rm = TRUE), .groups = "drop") %>%
+  arrange(desc(media_valor))
+
+# 3. Selecionar os 10 maiores países + Brasil
+top10 <- medias %>% slice_head(n = 10)
+brasil_info <- medias %>% filter(iso2c == "BR")
+top_paises <- bind_rows(top10, brasil_info) %>% distinct(iso2c, .keep_all = TRUE)
+
+# 4. Filtrar dados somente desses países e remover valores NA
+dados_filtrados <- dadosChangesinventories %>%
+  filter(iso2c %in% top_paises$iso2c) %>%
+  filter(!is.na(NE.GDI.STKB.CD), !is.na(year))
+
+# 5. Gerar um vetor de cores únicas para cada país (Brasil vermelho, outros bem contrastantes)
+# Usaremos a paleta "Dark2" (cores mais fortes e bem distintas)
+n_paises_outros <- length(unique(dados_filtrados$country)) - 1
+cores_outros <- brewer.pal(min(n_paises_outros, 8), "Dark2") # "Dark2" suporta até 8 cores
+
+# Se tiver mais de 8 países (o que não é o caso aqui), repetimos a paleta
+if (n_paises_outros > 8) {
+  cores_outros <- rep(cores_outros, length.out = n_paises_outros)
+}
+
+# Mapear as cores para cada país, garantindo que o Brasil seja vermelho
+countries_outros <- unique(dados_filtrados$country)[unique(dados_filtrados$country) != "Brazil"]
+country_colors <- setNames(cores_outros, countries_outros)
+country_colors <- c("Brazil" = "red", country_colors)  # Brasil = vermelho
+
+# 6. Gerar gráfico com cores distintas e eixo Y ajustado
+grafico <- ggplot(dados_filtrados, aes(x = year, y = NE.GDI.STKB.CD, color = country, group = country)) +
+  geom_line(linewidth = 1.2, alpha = 0.9) +
+  scale_color_manual(values = country_colors) +
+  scale_y_continuous(
+    labels = label_number(scale_cut = cut_short_scale()), 
+    breaks = seq(-150e9, 150e9, by = 75e9),  # Marcação de 75 bilhões (mais espaçado)
+    limits = c(-150e9, 150e9)
+  ) +
+  scale_x_continuous(
+    breaks = seq(1980, 2020, by = 10),
+    labels = seq(1980, 2020, by = 10),
+    limits = c(1980, 2020)
+  ) +
+  labs(
+    subtitle = "Top 10 países com maiores médias + Brasil destacado em vermelho", 
+    x = "Ano", 
+    y = "Changes in Inventories"
+  ) +
+  theme_minimal(base_size = 14) +
+  theme(
+    plot.title = element_blank(),
+    plot.subtitle = element_text(size = 13, hjust = 0.5),
+    plot.caption = element_text(size = 9, hjust = 0),
+    strip.text = element_text(face = "bold", size = 12),
+    axis.title.x = element_text(size = 12, margin = margin(t = 10)),
+    axis.title.y = element_text(size = 12, margin = margin(r = 10)),
+    axis.text.y = element_text(size = 10),
+    legend.position = "right",
+    legend.title = element_blank(),  # Remover título da legenda (fica mais limpo)
+    plot.margin = margin(t = 10, r = 10, b = 20, l = 20)
+  )
+
+# 7. Exibir o gráfico
+print(grafico)
+
+```
+
+## GRÁFICO DE DADOS DE CORTE TRANSVERSAL
+
+## **Gráfico 2 — Corte Transversal (Ano de 2023)**
+
+**O que mostra?**\
+Este mapa-múndi destaca a situação das mudanças nos inventários especificamente no ano de 2023 para todos os países com dados disponíveis.
+
+**Como interpretar?**
+
+As cores variam de roxo (valores mais baixos) a vermelho (valores mais altos).
+
+O degradê de cores indica a média das mudanças nos inventários em bilhões de dólares.
+
+Países sem dados estão em cinza claro.
+
+**O que observamos?**
+
+Concentração dos maiores valores (vermelho) em algumas grandes economias, evidenciando forte movimentação de estoques.
+
+O Brasil apresenta um valor relevante, porém não entre os extremos máximos.
+
+O mapa facilita a comparação espacial entre países, mostrando a distribuição global da variável em 2023.
+
+```{r}
+#| label: grafico_colunas_2023
+#| warning: false
+#| echo: false
+
+library(ggplot2)
+library(dplyr)
+library(scales)
+library(RColorBrewer)
+
+# 1. Calcular médias por país para NE.GDI.STKB.CD
+medias <- dadosChangesinventories %>%
+  group_by(iso2c, country) %>%
+  summarise(media_valor = mean(NE.GDI.STKB.CD, na.rm = TRUE), .groups = "drop") %>%
+  arrange(desc(media_valor))
+
+# 2. Selecionar os 10 países com maiores médias + Brasil
+top10 <- medias %>% slice_head(n = 10)
+brasil_info <- medias %>% filter(iso2c == "BR")
+top_paises <- bind_rows(top10, brasil_info) %>% distinct(iso2c, .keep_all = TRUE)
+
+# 3. Filtrar os dados de 2023 apenas desses países
+dados_barras <- dadosChangesinventories2023 %>%
+  filter(iso2c %in% top_paises$iso2c) %>%
+  filter(!is.na(NE.GDI.STKB.CD)) %>%
+  select(iso2c, country, NE.GDI.STKB.CD) %>%
+  distinct() %>%
+  arrange(NE.GDI.STKB.CD) %>%
+  mutate(country = factor(country, levels = country))
+
+# 4. Definir cores: Brasil em vermelho, os demais com cores distintas
+n_outros <- nrow(dados_barras) - 1
+cores_outros <- brewer.pal(max(3, min(11, n_outros)), "Set3")  # garantir que n esteja no intervalo 3-11
+cores_final <- ifelse(dados_barras$iso2c == "BR", "red", cores_outros[1:n_outros])
+names(cores_final) <- levels(dados_barras$country)
+
+# 5. Legenda personalizada com valores formatados
+legenda <- dados_barras %>%
+  mutate(valor_formatado = label_number(scale_cut = cut_short_scale())(NE.GDI.STKB.CD),
+         nome_legenda = ifelse(iso2c == "BR",
+                               paste0(country, " (", valor_formatado, ") [Brasil]"),
+                               paste0(country, " (", valor_formatado, ")"))) %>%
+  arrange(desc(NE.GDI.STKB.CD))
+
+# 6. Gráfico de colunas horizontais
+grafico_colunas <- ggplot(dados_barras, aes(x = country, y = NE.GDI.STKB.CD, fill = country)) +
+  geom_col(width = 0.7) +
+  coord_flip() +
+  scale_y_continuous(labels = label_number(scale_cut = cut_short_scale())) +
+  scale_fill_manual(values = cores_final) +
+  labs(
+    x = "País",
+    y = "Changes in Inventories (2023)",
+    subtitle = "Top 10 países com maiores valores em 2023 + Brasil destacado em vermelho",
+    caption = paste("Valores por país:\n",
+                    paste0(seq_along(legenda$nome_legenda), ". ", legenda$nome_legenda, collapse = "\n"))
+  ) +
+  theme_minimal(base_size = 14) +
+  theme(
+    plot.title = element_blank(),
+    plot.subtitle = element_text(size = 13, hjust = 0.5),
+    axis.title.x = element_text(size = 12, margin = margin(t = 10)),
+    axis.title.y = element_text(size = 12, margin = margin(r = 10)),
+    axis.text.x = element_text(size = 10),
+    axis.text.y = element_text(size = 11),
+    legend.position = "none",
+    plot.margin = margin(t = 10, r = 10, b = 20, l = 20)
+  )
+
+# 7. Exibir o gráfico
+print(grafico_colunas)
+
+# 1. Carregar pacotes
+library(ggplot2)
+library(dplyr)
+library(scales)
+library(sf)
+library(rnaturalearth)
+library(rnaturalearthdata)
+
+# 2. Obter o mapa-múndi
+world <- ne_countries(scale = "medium", returnclass = "sf")
+
+# 3. Calcular a média de NE.GDI.STKB.CD por país para 2023
+medias <- dadosChangesinventories2023 %>%
+  group_by(iso2c, country) %>%
+  summarise(media_valor = mean(NE.GDI.STKB.CD, na.rm = TRUE), .groups = "drop") %>%
+  arrange(desc(media_valor))
+
+# 4. Mesclar os dados de médias com o mapa do mundo
+world_data <- world %>%
+  left_join(medias, by = c("iso_a2" = "iso2c"))
+
+# 5. Definir o degradê de cores de roxo a vermelho (valores reais em bilhões)
+# Assumindo faixa 0 a 100 bilhões — ajuste aqui se necessário
+valores_limites <- c(0, 25e9, 50e9, 75e9, 100e9)  # em dólares
+cores <- c("purple", "blue", "green", "yellow", "red")
+
+# 6. Criar o gráfico com legenda corrigida
+grafico <- ggplot(data = world_data) +
+  geom_sf(aes(fill = media_valor), color = "white", size = 0.1) +
+  scale_fill_gradientn(
+    colors = cores,
+    values = scales::rescale(valores_limites),  # Escala real de 0 a 100 bi
+    breaks = valores_limites,  # Quebras exatas
+    labels = c("0", "25B", "50B", "75B", "100B+"),  # Rótulos claros
+    name = "Valor (USD)",  # Nome claro da legenda
+    na.value = "gray90"  # Cinza claro para países sem dados
+  ) +
+  labs(
+    title = "Mapa de Mudanças nos Inventários - 2023",
+    subtitle = "Degradê de cores representando valores médios de NE.GDI.STKB.CD"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = 0.5, size = 16),
+    plot.subtitle = element_text(hjust = 0.5, size = 12),
+    legend.position = "bottom",
+    plot.margin = margin(10, 10, 30, 10),
+    legend.title = element_text(size = 12),
+    legend.text = element_text(size = 10),
+    legend.key.width = unit(2, "cm")
+  )
+
+# Exibir o gráfico
+print(grafico)
+```
+
+## GRÁFICO DE DADOS DE SÉRIE TEMPORAL
+
+## **Gráfico 3 — Série Temporal (Brasil)**
+
+**O que mostra?**\
+Este gráfico foca exclusivamente na evolução das mudanças nos inventários do Brasil ao longo dos anos.
+
+**Como interpretar?**
+
+A linha vermelha representa as variações anuais dos inventários.
+
+A área abaixo da linha é preenchida em vermelho claro, simbolizando o valor que o Brasil representa a cada momento — com destaque para as variações positivas e negativas.
+
+Uma linha vertical marca o ano de 2020 (início da pandemia), com a anotação centralizada.
+
+**O que observamos?**
+
+O Brasil apresenta oscilações cíclicas, alternando períodos de acumulação e desestocagem.
+
+A pandemia de 2020 marca um ponto relevante, com impacto visível nas dinâmicas de inventário.
+
+Apesar de oscilações, os valores raramente ultrapassam ±30 bilhões de dólares.
+
+```{r}
+#| echo: false
+#| warning: false
+#| engine-path: "r"
+
+library(ggplot2)
+library(scales)
+
+# Gráfico de Dados de Série Temporal (Mudanças nos Inventários)
+grafserie <- ggplot(dadosChangesinventoriesbr, 
+                    mapping = aes(x = year, y = NE.GDI.STKB.CD)) +
+  
+  # 1️⃣ Preenchimento abaixo da linha do Brasil com vermelho claro, cobrindo a parte inferior
+  geom_area(aes(y = pmin(NE.GDI.STKB.CD, 0)), fill = "lightcoral", alpha = 0.4) +  # Área vermelha abaixo da linha
+  
+  # 2️⃣ Linha principal do Brasil (vermelho escuro)
+  geom_line(color = 'red', size = 1.5) +  
+  
+  # 3️⃣ Linha vertical no ano da pandemia (2020) e rótulo no centro do gráfico
+  geom_vline(xintercept = 2020, linetype = "dashed", color = "black", size = 1) +
+  annotate("text", x = 2020, y = 0, 
+           label = "Início da pandemia (2020)", vjust = -0.5, size = 4, angle = 90, hjust = 0.5) + 
+  
+  # 4️⃣ Títulos e eixos
+  labs(title = "Mudanças nos Inventários - Brasil", 
+       x = "Ano", 
+       y = "Mudanças nos Inventários (USD)") +  
+  
+  # Eixo Y com valores em bilhões, limitado a -30 bilhões
+  scale_y_continuous(labels = label_number(scale = 1e-9, suffix = " Bilhões"),
+                     limits = c(-30e9, max(dadosChangesinventoriesbr$NE.GDI.STKB.CD, na.rm = TRUE) + 5e9)) +  
+  
+  # Eixo X começando em 1980, com intervalo de 10 anos
+  scale_x_continuous(breaks = seq(1980, max(dadosChangesinventoriesbr$year), by = 10)) +  
+  
+  # Tema e estilo
+  theme_minimal(base_size = 14) + 
+  theme(
+    legend.position = "none", 
+    text = element_text(family = "Arial", color = "black"), 
+    plot.title = element_text(hjust = 0.5, size = 18, face = "bold"),  
+    axis.title = element_text(face = "bold"),  
+    axis.text = element_text(size = 12),  
+    axis.title.x = element_text(margin = margin(t = 10)),  
+    axis.title.y = element_text(margin = margin(r = 10))   
+  )
+
+# Exibir o gráfico
+print(grafserie)
+```
+
+## **Conclusão Geral**
+
+A análise em três dimensões — painel, espacial e temporal — permite entender as mudanças nos inventários de forma abrangente:
+
+**Entre países**, há diferenças significativas no comportamento dos estoques, com grandes economias mostrando movimentos mais expressivos.
+
+**Em 2023**, o mapa evidencia as posições relativas de cada país, destacando a importância de entender o contexto econômico global.
+
+**No Brasil**, a série histórica revela que, apesar de variações e choques como a pandemia, as mudanças nos inventários mantêm-se dentro de um intervalo moderado.
+
+**Mensagem final:**\
+As mudanças nos inventários são um importante indicador do ciclo econômico e da dinâmica produtiva dos países, sendo fundamentais para entender flutuações de crescimento e produção.
