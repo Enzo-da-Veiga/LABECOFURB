@@ -1,0 +1,109 @@
+---
+title: "Enzo Euzébio Martins da Veiga"
+format: html
+editor: visual
+---
+
+```{r}
+#| label: load-packages
+#| include: false
+
+library(GetBCBData)
+library(tidyverse)
+library(scales)
+library(gganimate)
+library(gifski)
+library(transformr)
+# Obter dados
+my.id <- c(dps = 7610)
+df.bcb <- gbcbd_get_series(
+  id = my.id,
+  first.date = '1996-01-31',
+  last.date = '2012-12-01',
+  format.data = 'long',
+  use.memoise = TRUE,
+  cache.path = tempdir(),
+  do.parallel = FALSE
+)
+
+# Limite superior do eixo Y arredondado
+limite_y <- ceiling(max(df.bcb$value) / 20000) * 20000
+```
+
+# Evolução das Despesas com Pessoal do Ministério dos Esportes
+
+## Introdução
+
+A série 7610 do Banco Central do Brasil fornece dados históricos sobre as despesas com pessoal do Ministério dos Esportes, abrangendo o período de janeiro de 1996 a dezembro de 2012. Esses dados são essenciais para analisar a evolução dos gastos públicos na área esportiva, permitindo avaliar a eficiência e os investimentos realizados pelo governo federal nesse setor.
+
+## Explicação do Gráfico
+
+O gráfico gerado a partir da série 7610 apresenta a evolução mensal das despesas com pessoal do Ministério dos Esportes ao longo dos anos. A linha azul representa o valor total gasto a cada mês, enquanto os pontos vermelhos destacam os valores individuais. A escala do eixo Y está ajustada para refletir os valores em milhares de reais, facilitando a visualização das variações ao longo do tempo.
+
+```{r}
+#| label: grafico1
+#| warning: false
+#| echo: false
+
+# Criar os anos fixos desejados
+anos_desejados <- as.Date(c("1998-01-01", "2002-01-01", "2006-01-01", "2010-01-01", "2014-01-01"))
+
+# Criar pausa: repetir o último ponto 30 vezes (~3 segundos a 10 fps)
+ultima_data <- max(df.bcb$ref.date)
+df_pausa <- df.bcb %>%
+  filter(ref.date == ultima_data) %>%
+  slice(rep(1, 30)) %>%
+  mutate(ref.date = ref.date + seq_len(30))  # cria datas fictícias para manter a linha parada
+
+# Junta os dados originais com os frames de pausa
+df_extendido <- bind_rows(df.bcb, df_pausa)
+
+# Define limite Y arredondado para múltiplos de 5 mil
+limite_y <- ceiling(max(df_extendido$value) / 5000) * 5000
+
+# Gráfico com pausa embutida no final
+ggplot(df_extendido, aes(x = ref.date, y = value)) +
+  geom_line(color = "steelblue", linewidth = 1) +
+  geom_point(color = "darkred", size = 1.5) +
+  scale_x_date(
+    breaks = anos_desejados,
+    labels = format(anos_desejados, "%Y"),
+    limits = c(as.Date("1996-01-01"), as.Date("2014-12-31"))
+  ) +
+  scale_y_continuous(
+    limits = c(0, limite_y),
+    breaks = seq(0, limite_y, by = 5000),
+    labels = label_comma(big.mark = ".", decimal.mark = ",")
+  ) +
+  labs(
+    title = "Evolução das Despesas com Pessoal - Ministério dos Esportes",
+    subtitle = 'Ano: {frame_along}',
+    x = "Ano",
+    y = "Despesas (R$ mil)"
+  ) +
+  theme_minimal(base_size = 13) +
+  theme(
+    plot.title = element_text(face = "bold"),
+    plot.subtitle = element_text(color = "gray30")
+  ) +
+  transition_reveal(ref.date) +
+  ease_aes('linear')
+
+
+```
+
+## Análise dos Valores
+
+Ao longo do período analisado, observa-se um crescimento gradual nas despesas com pessoal, com picos em determinados anos. Esse aumento pode ser atribuído a diversos fatores, como a implementação de programas esportivos, aumento de pessoal contratado e ajustes salariais. É importante destacar que, apesar do crescimento, os valores permanecem dentro de limites sustentáveis, indicando uma gestão fiscal responsável.
+
+## Impacto das Despesas com Pessoal
+
+As despesas com pessoal têm um impacto direto na execução de políticas públicas. No caso do Ministério dos Esportes, esses gastos refletem investimentos em infraestrutura esportiva, programas de incentivo à prática esportiva e apoio a atletas. Portanto, o aumento nas despesas pode ser interpretado como um esforço do governo para promover o esporte como ferramenta de inclusão social e desenvolvimento.
+
+## Descontinuação da Série
+
+A série 7610 foi descontinuada em dezembro de 2012. A descontinuação pode ser atribuída a mudanças na metodologia de coleta de dados ou à integração das informações em sistemas mais abrangentes. A partir de 2013, os dados passaram a ser consolidados em outras séries, como a 7611, que abrange despesas com pessoal de diversos ministérios, incluindo o Ministério dos Esportes.
+
+## Conclusão
+
+A análise da série 7610 proporciona uma visão detalhada das despesas com pessoal do Ministério dos Esportes entre 1996 e 2012. Embora a série tenha sido descontinuada, ela oferece insights valiosos sobre a evolução dos investimentos públicos no setor esportivo. A continuidade da coleta e análise desses dados é fundamental para garantir a transparência e a eficiência na aplicação dos recursos públicos.
